@@ -23,13 +23,77 @@ def bakeries():
     bakeries = [bakery.to_dict() for bakery in Bakery.query.all()]
     return make_response(  bakeries,   200  )
 
-@app.route('/bakeries/<int:id>')
+@app.route('/bakeries/<int:id>',methods=['GET','PATCH'])
 def bakery_by_id(id):
-
     bakery = Bakery.query.filter_by(id=id).first()
-    bakery_serialized = bakery.to_dict()
-    return make_response ( bakery_serialized, 200  )
+    if request.method == 'GET':
+        bakery_serialized = bakery.to_dict()
+        return make_response ( bakery_serialized, 200)
+    elif request.method == 'PATCH':
+        for att in request.form:
+            setattr(bakery,att,request.form.get(att))
+            db.session.add(bakery)
+            db.session.commit()
+            bakery_dict = bakery.to_dict()
+            return make_response(bakery_dict,200)
 
+   
+@app.route('/baked_goods/<int:id>',methods=['DELETE','GET'])
+def delete_id(id):
+    baked_goods=BakedGood.query.filter(BakedGood.id == id).first()
+    if request.method == 'GET':
+        baked_serialized = baked_goods.to_dict()
+        return make_response(baked_serialized,200)
+    
+    elif request.method == 'DELETE':
+        db.session.delete(baked_goods)
+        db.session.commit()
+        response_body={
+            'deleted_successfully':True,
+            'message':'deleted successfuly'
+        }
+        response=make_response(response_body,200)
+        return response
+
+   
+
+@app.route('/baked_goods',methods=['GET','POST'])
+def post_goods():
+    baked=BakedGood.query.all()
+
+    if request.method == 'GET':
+        baked_dict=[bake.to_dict() for bake in baked]
+        response = make_response(baked_dict,200)
+        return response
+    
+    elif request.method == 'POST':
+        name = request.form.get('name')
+        price = request.form.get('price')   
+        bakery_id = request.form.get('bakery_id')
+        if not name or not price or not bakery_id:
+            response=make_response(jsonify({'error':['validation error']}),400)
+            return response
+        try:
+            price=int(price)
+            bakery_id=int(bakery_id)
+        except ValueError:
+            response=make_response(jsonify({'error':['price and bakery_id must be integers']}),400)
+        
+        new_request=BakedGood(
+            name = name,
+            price = price,
+            bakery_id = bakery_id
+        )
+        db.session.add(new_request)
+        db.session.commit()
+
+        request_dict=new_request.to_dict()
+        response = make_response(jsonify(request_dict),201)
+        return response
+    
+    response=make_response({'error':'new_bakery not created'},400)
+    return response
+    
 @app.route('/baked_goods/by_price')
 def baked_goods_by_price():
     baked_goods_by_price = BakedGood.query.order_by(BakedGood.price.desc()).all()
